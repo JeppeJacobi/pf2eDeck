@@ -2,6 +2,28 @@ from typing import ClassVar, Set, Optional, List
 from decimal import Decimal
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 
+
+class HeightenedEntry(BaseModel):
+    increment: Optional[int] = None
+    minimum_rank: Optional[int] = None
+    text: str
+
+
+class HeightenedBlock(BaseModel):
+    entries: List[HeightenedEntry] = []
+
+
+class ActionDetail(BaseModel):
+    text: Optional[str] = None
+
+
+class ActionsBlock(BaseModel):
+    one: Optional[ActionDetail] = None
+    two: Optional[ActionDetail] = None
+    three: Optional[ActionDetail] = None
+    reaction: Optional[ActionDetail] = None
+    free: Optional[ActionDetail] = None
+
 class CardBase(BaseModel):
     """
     Abstract base model for all card-like game entities
@@ -24,6 +46,7 @@ class CardBase(BaseModel):
     card_type: str = Field(..., description="Card type")
     tier: Optional[int] = None
     actions: Optional[str] = None
+    action_variants: Optional[ActionsBlock] = None
 
     traits: Optional[List[str]] = None
     traditions: Optional[List[str]] = None
@@ -40,6 +63,8 @@ class CardBase(BaseModel):
         None,
         description="Main descriptive rules text, stored as HTML or Markdown"
     )
+
+    heightening: Optional[HeightenedBlock] = None
 
     source: Optional[str] = None
 

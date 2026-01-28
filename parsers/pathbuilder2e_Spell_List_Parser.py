@@ -6,6 +6,8 @@ from typing import List, Optional, Dict, Tuple
 
 from bs4 import BeautifulSoup, Tag
 from models.SpellCard import SpellCard  # adjust import to your project
+from models.SpellCard import DegreesOfSuccess
+from models.CardBase import HeightenedBlock, HeightenedEntry, ActionsBlock, ActionDetail
 
 
 # -------- helpers --------
@@ -38,8 +40,8 @@ def parse_action_from_icon_src(src: str) -> Optional[str]:
         return "2"
     if "action_triple" in src:
         return "3"
-    if "action_range" in src:
-        return "reaction"  # or "varies" depending on your conventions
+    if "action_reaction" in src:
+        return "reaction"
     return None
 
 def find_next_spell_block_start(tag: Tag) -> Optional[Tag]:
@@ -76,112 +78,247 @@ def parse_label_line_from_body(body_div: Tag) -> Tuple[Dict[str, str], str]:
     In the body div, Pathbuilder uses <b>Label</b> value; ... <br> ... then prose.
     We'll parse the bold-label fields and also keep full HTML as body.
     """
-    # Split label line from prose by the first double <br>. Also remove that pair from body HTML.
-    contents = list(body_div.contents)
+    # Work on raw HTML so nested/malformed tags (e.g., "<st br>") don't hide line breaks.
+    full_html = body_div.decode_contents()
 
-    def _is_whitespace(node) -> bool:
-        return not isinstance(node, Tag) and str(node).strip() == ""
-
-    double_br_start = None
-    double_br_end = None
-    for i, c in enumerate(contents):
-        if not (isinstance(c, Tag) and c.name == "br"):
-            continue
-        # Find next non-whitespace node
-        j = i + 1
-        while j < len(contents) and _is_whitespace(contents[j]):
-            j += 1
-        if j < len(contents) and isinstance(contents[j], Tag) and contents[j].name == "br":
-            double_br_start = i
-            double_br_end = j
-            break
-
-    # Fallback to first <br> if no double <br> is present
-    if double_br_start is None:
-        br_indices = [i for i, c in enumerate(contents) if isinstance(c, Tag) and c.name == "br"]
-        if br_indices:
-            double_br_start = br_indices[0]
-            double_br_end = br_indices[1] if len(br_indices) > 1 else br_indices[0]
-
-    # Extract pairs from the HTML in a simple way: <b>Label</b> textUntilNextBoldOrBreak
-    # Approach: walk children and capture <b> tags and the following text.
+    # Extract label/value pairs from the label block using HTML slicing.
     fields: Dict[str, str] = {}
 
-    current_label: Optional[str] = None
-    current_value_parts: List[str] = []
+    # Label block ends at the first <br> that is NOT followed by another <b> label.
+    break_match = re.search(
+        r"<br\s*/?>\s*(?!<b)(?:<br\s*/?>\s*)?",
+        full_html,
+        flags=re.IGNORECASE,
+    )
 
-    def flush():
-        nonlocal current_label, current_value_parts
-        if current_label:
-            val = norm_ws("".join(current_value_parts))
-            if val:
-                fields[current_label] = val
-        current_label = None
-        current_value_parts = []
-
-    # Determine where the label block ends: the first <br> followed by non-<b> content.
-    label_break_index = None
-    for i, c in enumerate(contents):
-        if not (isinstance(c, Tag) and c.name == "br"):
-            continue
-        j = i + 1
-        while j < len(contents) and _is_whitespace(contents[j]):
-            j += 1
-        if j >= len(contents):
-            label_break_index = i
-            break
-        if not (isinstance(contents[j], Tag) and contents[j].name == "b"):
-            label_break_index = i
-            break
-
-    # Only parse labels up to the detected label break (or fallback to first double <br>).
-    if label_break_index is not None:
-        label_children = contents[:label_break_index]
+    if break_match:
+        label_block_html = full_html[: break_match.start()]
+        body_html = full_html[break_match.end():].strip()
     else:
-        label_children = contents if double_br_start is None else contents[:double_br_start]
+        label_block_html = full_html
+        body_html = full_html.strip()
 
-    for child in label_children:
-        if isinstance(child, Tag) and child.name == "b":
-            # New label begins
-            flush()
-            current_label = norm_ws(child.get_text(" ", strip=True)).rstrip(":")
-        else:
-            # collect value-ish text, but stop at double breaks is too annoying; keep simple
-            txt = ""
-            if isinstance(child, Tag):
-                # preserve semicolons/line breaks in text version
-                txt = child.get_text(" ", strip=False)
-            else:
-                txt = str(child)
-            current_value_parts.append(txt)
-
-    flush()
-
-    # Build body_html from only the prose after the label block when labels were found.
-    if fields:
-        if label_break_index is not None:
-            body_start = label_break_index + 1
-            while body_start < len(contents):
-                node = contents[body_start]
-                if _is_whitespace(node):
-                    body_start += 1
-                    continue
-                if isinstance(node, Tag) and node.name == "br":
-                    body_start += 1
-                    continue
-                break
-            body_html = "".join(str(c) for c in contents[body_start:]).strip()
-        elif double_br_end is not None:
-            body_start = double_br_end + 1
-            body_html = "".join(str(c) for c in contents[body_start:]).strip()
-        else:
-            body_html = "".join(str(c) for c in contents).strip()
-    else:
-        body_html = "".join(str(c) for c in contents).strip()
+    label_matches = list(re.finditer(r"<b>\s*([^<]+?)\s*</b>", label_block_html, flags=re.IGNORECASE))
+    for idx, match in enumerate(label_matches):
+        label = norm_ws(match.group(1)).rstrip(":")
+        start = match.end()
+        end = label_matches[idx + 1].start() if idx + 1 < len(label_matches) else len(label_block_html)
+        value_html = label_block_html[start:end]
+        value_text = BeautifulSoup(value_html, "lxml").get_text(" ", strip=True)
+        value_text = norm_ws(value_text)
+        if label and value_text:
+            fields[label] = value_text
+    # If no fields were found, keep full HTML as body.
+    if not fields:
+        body_html = full_html.strip()
 
     # fields keys examples: "Range", "Targets", "Area", "Duration", "Defense", "Saving Throw", "Cast"
     # We'll map later.
     return fields, body_html
+
+
+def extract_heightened_from_html(body_html: str) -> Tuple[Optional[HeightenedBlock], str]:
+    """
+    Extract Heightened entries from body HTML and return the block plus cleaned HTML.
+    """
+    if not body_html:
+        return None, body_html
+
+    soup = BeautifulSoup(body_html, "lxml")
+    text = soup.get_text("\n")
+
+    entries: List[HeightenedEntry] = []
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.lower().startswith("heightened"):
+            # Parse label forms: "Heightened (+1)" or "Heightened (2nd)"
+            inc = None
+            min_rank = None
+            label = line
+            m = re.match(r"heightened\s*\(([^)]*)\)", line, re.IGNORECASE)
+            # Handle split label: "Heightened" on one line and "(4th)" on next
+            if m is None and i + 1 < len(lines) and lines[i + 1].startswith("("):
+                label = f"{line} {lines[i + 1]}"
+                m = re.match(r"heightened\s*\(([^)]*)\)", label, re.IGNORECASE)
+                i += 1
+            if m:
+                val = m.group(1).strip()
+                if val.startswith("+") and val[1:].isdigit():
+                    inc = int(val[1:])
+                else:
+                    # ordinal like 2nd, 4th, etc.
+                    num = re.match(r"(\d+)", val)
+                    if num:
+                        min_rank = int(num.group(1))
+            # Capture following line(s) as text until next Heightened or end
+            effect_parts: List[str] = []
+            j = i + 1
+            while j < len(lines) and not lines[j].lower().startswith("heightened"):
+                effect_parts.append(lines[j])
+                j += 1
+            effect_text = " ".join(effect_parts).strip()
+            entries.append(HeightenedEntry(increment=inc, minimum_rank=min_rank, text=effect_text or label))
+            i = j
+        else:
+            i += 1
+
+    if not entries:
+        return None, body_html
+
+    # Remove Heightened paragraphs from HTML by dropping any line containing "<b>Heightened"
+    cleaned = re.sub(r"<br\s*/?>\s*<b>\s*Heightened[^<]*</b>[^<]*", "", body_html, flags=re.IGNORECASE)
+    return HeightenedBlock(entries=entries), cleaned
+
+
+def extract_degrees_from_html(body_html: str) -> Tuple[Optional[DegreesOfSuccess], str]:
+    """
+    Extract Degrees of Success entries and return the block plus cleaned HTML.
+    """
+    if not body_html:
+        return None, body_html
+
+    soup = BeautifulSoup(body_html, "lxml")
+    text = soup.get_text("\n")
+    raw_lines = [line.strip() for line in text.splitlines() if line.strip()]
+    lines: List[str] = []
+    i = 0
+    while i < len(raw_lines):
+        line = raw_lines[i]
+        if line.lower() == "critical" and i + 1 < len(raw_lines):
+            nxt = raw_lines[i + 1]
+            low = nxt.lower()
+            if low.startswith("success"):
+                rest = nxt[len("success"):].strip()
+                merged = "Critical Success" + (f" {rest}" if rest else "")
+                lines.append(merged)
+                i += 2
+                continue
+            if low.startswith("failure"):
+                rest = nxt[len("failure"):].strip()
+                merged = "Critical Failure" + (f" {rest}" if rest else "")
+                lines.append(merged)
+                i += 2
+                continue
+        lines.append(line)
+        i += 1
+
+    def normalize_label(label: str) -> Optional[str]:
+        label = label.strip().lower()
+        if label == "critical success":
+            return "critical_success"
+        if label == "success":
+            return "success"
+        if label == "failure":
+            return "failure"
+        if label == "critical failure":
+            return "critical_failure"
+        return None
+
+    degrees = DegreesOfSuccess()
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.lower().startswith("critical success"):
+            key = "critical_success"
+        elif line.lower().startswith("success"):
+            key = "success"
+        elif line.lower().startswith("failure"):
+            key = "failure"
+        elif line.lower().startswith("critical failure"):
+            key = "critical_failure"
+        else:
+            i += 1
+            continue
+
+        effect_parts: List[str] = []
+        j = i + 1
+        while j < len(lines):
+            nxt = lines[j].lower()
+            if nxt.startswith("critical success") or nxt.startswith("success") or nxt.startswith("failure") or nxt.startswith("critical failure"):
+                break
+            if nxt.startswith("heightened"):
+                break
+            effect_parts.append(lines[j])
+            j += 1
+        effect_text = " ".join(effect_parts).strip()
+        setattr(degrees, key, effect_text or line)
+        i = j
+
+    if not any([degrees.critical_success, degrees.success, degrees.failure, degrees.critical_failure]):
+        return None, body_html
+
+    # Remove degree lines from HTML (including split <b>Critical</b><b>Success</b>)
+    cleaned = re.sub(
+        r"<br\s*/?>\s*<b>\s*(Critical\s+Success|Critical\s+Failure|Success|Failure)\s*</b>[^<]*",
+        "",
+        body_html,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(
+        r"<br\s*/?>\s*<b>\s*Critical\s*</b>\s*<b>\s*(Success|Failure)\s*</b>[^<]*",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    return degrees, cleaned
+
+
+_ACTION_MARKER_RE = re.compile(
+    r"\[(one-action|two-actions|three-actions|reaction|free-action)\]",
+    re.IGNORECASE,
+)
+
+
+def extract_action_variants_from_html(body_html: str) -> Tuple[Optional[ActionsBlock], str]:
+    """
+    Extract action-variant blocks like [one-action] from body HTML.
+    """
+    if not body_html:
+        return None, body_html
+
+    matches = list(_ACTION_MARKER_RE.finditer(body_html))
+    if not matches:
+        return None, body_html
+
+    def key_for_marker(marker: str) -> str:
+        marker = marker.lower()
+        if marker == "one-action":
+            return "one"
+        if marker == "two-actions":
+            return "two"
+        if marker == "three-actions":
+            return "three"
+        if marker == "reaction":
+            return "reaction"
+        if marker == "free-action":
+            return "free"
+        return marker
+
+    actions = ActionsBlock()
+    cleaned_chunks: List[str] = []
+    prev = 0
+    for idx, m in enumerate(matches):
+        marker = m.group(1)
+        start = m.end()
+        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(body_html)
+
+        cleaned_chunks.append(body_html[prev:m.start()])
+        prev = end
+
+        text = body_html[start:end]
+        text = re.sub(r"^(?:\s*<br\s*/?>\s*)+", "", text).strip()
+        text = re.sub(r"(?:\s*<br\s*/?>\s*)+$", "", text).strip()
+
+        key = key_for_marker(marker)
+        if hasattr(actions, key):
+            setattr(actions, key, ActionDetail(text=text or None))
+
+    cleaned_chunks.append(body_html[prev:])
+    cleaned = "".join(cleaned_chunks).strip()
+    return actions, cleaned
 
 
 # -------- main parser --------
@@ -247,6 +384,9 @@ def parse_pathbuilder_spellbook_html(html: str) -> List[SpellCard]:
             continue
 
         label_fields, body_html = parse_label_line_from_body(body_div)
+        action_variants, body_html = extract_action_variants_from_html(body_html)
+        degrees_of_success, body_html = extract_degrees_from_html(body_html)
+        heightening, body_html = extract_heightened_from_html(body_html)
 
         # Map label fields into your model fields
         # Many spells use: Range, Targets, Area, Duration, Defense, Saving Throw, Cast, Requirements
@@ -280,6 +420,9 @@ def parse_pathbuilder_spellbook_html(html: str) -> List[SpellCard]:
             saving_throw=saving_throw,
             requirements=requirements,
             body=body_html,
+            action_variants=action_variants,
+            heightening=heightening,
+            degrees_of_success=degrees_of_success,
             source=source,
         )
         spells.append(spell)

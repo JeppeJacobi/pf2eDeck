@@ -78,7 +78,7 @@ body {
   page-break-inside: avoid;
   border: 2px solid var(--accent);
   border-radius: 8px;
-  margin: 0 0 6mm 0;
+  margin: 0 0 10px 0;
   background: var(--accent);
   box-shadow: none;
   position: relative;
@@ -211,6 +211,26 @@ body {
   padding-left: 1.2em;
   text-indent: -1.2em;
   line-height: 1.2;
+}
+
+.action-block {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 6px 0;
+}
+
+.action-item {
+  display: block;
+  padding-left: 1.2em;
+  text-indent: -1.2em;
+  line-height: 1.2;
+}
+
+.action-glyph {
+  font-family: "Pathfinder2eActions", serif;
+  font-size: 13px;
+  line-height: 1;
+  margin-right: 4px;
 }
 
 .card__tier {
