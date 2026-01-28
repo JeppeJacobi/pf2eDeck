@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spell Cards</title>
+  <link rel="stylesheet" href="../styles/spell_cards.css" />
+</head>
+<body>
+  <main class="sheet">
+    {% for card in cards %}
+    <article class="card" data-id="{{ card.id }}" data-tier="{{ card.tier }}">
+      <header class="card__header">
+        <div class="card__header-content">
+          <h2 class="card__name">{{ card.name }}</h2>
+          {% if card.actions and card.actions.glyph %}
+          <div class="meta-item card__actions">
+            <span class="meta-value actions-glyph" aria-label="{{ card.actions.label }}">{{ card.actions.glyph }}</span>
+          </div>
+          {% endif %}
+          <div class="card__meta">
+            {% if card.meta.cast_time %}
+            <div class="meta-item"><span class="meta-label">Cast:</span><span class="meta-value">{{ card.meta.cast_time }}</span></div>
+            {% endif %}
+            {% if card.meta.range %}
+            <div class="meta-item"><span class="meta-label">Range:</span><span class="meta-value">{{ card.meta.range }}</span></div>
+            {% endif %}
+            {% if card.meta.targets %}
+            <div class="meta-item"><span class="meta-label">Targets:</span><span class="meta-value">{{ card.meta.targets }}</span></div>
+            {% endif %}
+            {% if card.meta.area %}
+            <div class="meta-item"><span class="meta-label">Area:</span><span class="meta-value">{{ card.meta.area }}</span></div>
+            {% endif %}
+            {% if card.meta.duration %}
+            <div class="meta-item"><span class="meta-label">Duration:</span><span class="meta-value">{{ card.meta.duration }}</span></div>
+            {% endif %}
+            {% if card.meta.saving_throw %}
+            <div class="meta-item"><span class="meta-label">Saving Throw:</span><span class="meta-value">{{ card.meta.saving_throw }}</span></div>
+            {% endif %}
+            {% if card.meta.requirements %}
+            <div class="meta-item"><span class="meta-label">Requirements:</span><span class="meta-value">{{ card.meta.requirements }}</span></div>
+            {% endif %}
+          </div>
+          <div class="card__tier">{{ card.type | capitalize }} {{ card.tier }}</div>
+        </div>
+      </header>
+
+      <section class="card__panel">
+        {% if card.traits %}
+        <div class="card__traits">
+          {% for trait in card.traits %}
+          <span class="trait">{{ trait }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if card.has_body %}
+        <div class="card__body">
+          {{ card.body_html | safe }}
+        </div>
+        {% endif %}
+
+        <footer class="card__footer">
+          {% if card.source %}
+          <span class="card__source">{{ card.source }}</span>
+          {% endif %}
+        </footer>
+      </section>
+    </article>
+    {% endfor %}
+  </main>
+</body>
+</html>

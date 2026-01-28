@@ -1,0 +1,251 @@
+:root {
+  --page-margin: 12mm;
+  --paper: #ffffff;
+  --ink: #1f1b16;
+  --muted: #5f5347;
+  --accent: #9b2c2c;
+  --border: #cbb8a3;
+  --shadow: rgba(0, 0, 0, 0.12);
+  --title-font: "ModestoCondensed", "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  --body-font: "ScalaSans", "Gill Sans", "Trebuchet MS", "Noto Sans", sans-serif;
+}
+
+@font-face {
+  font-family: "ModestoCondensed";
+  src: url("../fonts/ModestoCondensed.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "ScalaSans";
+  src: url("../fonts/ScalaSansOT.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "ScalaSans";
+  src: url("../fonts/ScalaSans_b.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "ScalaSans";
+  src: url("../fonts/ScalaSans_it.otf") format("opentype");
+  font-weight: 400;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Pathfinder2eActions";
+  src: url("../fonts/Pathfinder2eActions.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@page {
+  size: A4 portrait;
+  margin: var(--page-margin);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  color: var(--ink);
+  font-family: var(--body-font);
+  background: var(--paper);
+}
+
+body {
+  background: var(--paper);
+}
+
+.sheet {
+  column-count: 1;
+  column-gap: 0;
+  column-fill: auto;
+}
+
+.card {
+  display: block;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  margin: 0 0 6mm 0;
+  background: var(--accent);
+  box-shadow: none;
+  position: relative;
+  overflow: visible;
+}
+
+.card__header {
+  position: relative;
+  height: 13px;
+  padding: 0 20px;
+  background: transparent;
+  color: #fff;
+}
+
+.card__header-content {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: -4.9px;
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.card__panel {
+  margin: 1px;
+  padding: 4px 10px 6px 10px;
+  background: #ffffff;
+  border-radius: 6px;
+}
+
+.card__name {
+  margin: 0;
+  font-family: var(--title-font);
+  font-size: 16px;
+  letter-spacing: 0.2px;
+}
+
+.trait {
+  display: inline-block;
+  padding: 0px 4px 0px 4px;
+  border-radius: 5px;
+  font-size: 10px;
+  text-transform: lowercase;
+  transform: translateY(0px);
+  letter-spacing: 0.6px;
+  color: #fff;
+  background: var(--accent);
+}
+
+.actions-glyph {
+  font-family: "Pathfinder2eActions", serif;
+  font-size: 22px;
+  line-height: 1;
+  color: inherit;
+}
+
+.card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 13px;
+}
+
+.meta-item {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  transform: translateY(.3px);
+}
+
+.meta-label {
+  width: auto;
+  font-weight: 700;
+  color: inherit;
+  letter-spacing: 0.4px;
+  font-size: 13px;
+}
+
+.card__actions {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  transform: translateY(-.6px);
+}
+
+.card__traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 0 2px 0;
+}
+
+.card__body {
+  padding: 0;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.card__body p {
+  margin: 0 0 5px 0;
+}
+
+.card__body b {
+  color: var(--accent);
+}
+
+.degree-block {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 6px 0;
+}
+
+.degree {
+  display: block;
+  padding-left: 1.2em;
+  text-indent: -1.2em;
+  line-height: 1.2;
+}
+
+.heightened-block {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 6px 0;
+}
+
+.heightened {
+  display: block;
+  padding-left: 1.2em;
+  text-indent: -1.2em;
+  line-height: 1.2;
+}
+
+.card__tier {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 16px;
+  color: inherit;
+  text-align: right;
+  font-family: var(--title-font);
+}
+
+.card__footer {
+  position: absolute;
+  right: 20%;
+  bottom: 0;
+  transform: translateY(calc(50% - 0.7px));
+  padding: 0 1px;
+  background: #ffffff;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--accent);
+  z-index: 2;
+}
+
+.card__source {
+  text-align: right;
+}
+
+@media print {
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body {
+    background: var(--paper);
+  }
+}
